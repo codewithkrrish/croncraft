@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CronCraft — Visual Cron Builder &amp; Explainer</title>
+<meta name="description" content="Build cron expressions visually, see what they mean in plain English, and preview upcoming run times. Single file, no dependencies.">
+<style>
+  :root {
+    --bg: #0c0c0f;
+    --card: #141419;
+    --card-2: #1b1b22;
+    --border: #26262e;
+    --text: #f4f4f5;
+    --muted: #a1a1aa;
+    --accent: #e11d48;
+    --accent-dim: rgba(225, 29, 72, 0.14);
+    --green: #34d399;
+    --amber: #fbbf24;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+    padding: 40px 16px 64px;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; }
+
+  header { text-align: center; margin-bottom: 32px; }
+  .logo {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 56px; height: 56px; border-radius: 16px;
+    background: var(--accent-dim); border: 1px solid var(--accent);
+    font-family: var(--mono); font-weight: 700; font-size: 26px; color: var(--accent);
+    margin-bottom: 14px;
+  }
+  h1 { font-size: 32px; letter-spacing: -0.5px; }
+  h1 span { color: var(--accent); }
+  .tagline { color: var(--muted); margin-top: 6px; font-size: 15px; }
+
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 14px; padding: 22px; margin-bottom: 18px;
+  }
+  .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); margin-bottom: 14px; }
+
+  .presets { display: flex; flex-wrap: wrap; gap: 8px; }
+  .preset {
+    background: var(--card-2); border: 1px solid var(--border); color: var(--text);
+    border-radius: 999px; padding: 7px 14px; font-size: 13px; cursor: pointer;
+    transition: border-color .15s, background .15s;
+  }
+  .preset:hover { border-color: var(--accent); background: var(--accent-dim); }
+  .preset.active { border-color: var(--accent); background: var(--accent-dim); }
+
+  .fields { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+  @media (max-width: 640px) { .fields { grid-template-columns: repeat(2, 1fr); } }
+  .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  .field label b { color: var(--text); font-weight: 600; }
+  .field input {
+    width: 100%; background: var(--bg); border: 1px solid var(--border);
+    color: var(--text); border-radius: 8px; padding: 10px 12px;
+    font-family: var(--mono); font-size: 15px;
+  }
+  .field input:focus { outline: none; border-color: var(--accent); }
+  .field input.invalid { border-color: var(--amber); }
+  .error { display: none; margin-top: 12px; color: var(--amber); font-size: 13px; }
+  .error.show { display: block; }
+
+  .expr-row { display: flex; gap: 10px; margin-top: 16px; }
+  .expr-row input {
+    flex: 1; background: var(--bg); border: 1px solid var(--border); color: var(--text);
+    border-radius: 8px; padding: 12px 14px; font-family: var(--mono); font-size: 15px;
+  }
+  .expr-row input:focus { outline: none; border-color: var(--accent); }
+  .btn {
+    background: var(--accent); border: none; color: #fff; border-radius: 8px;
+    padding: 0 20px; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap;
+  }
+  .btn:hover { filter: brightness(1.12); }
+  .hint { color: var(--muted); font-size: 12.5px; margin-top: 10px; }
+  .hint code { font-family: var(--mono); color: var(--text); background: var(--card-2); padding: 1px 6px; border-radius: 5px; }
+
+  .expr-out {
+    display: flex; align-items: center; gap: 12px; background: var(--bg);
+    border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; margin-bottom: 14px;
+  }
+  .expr-out code { font-family: var(--mono); font-size: 20px; color: var(--accent); letter-spacing: 1px; flex: 1; overflow-x: auto; }
+  .copy-btn {
+    background: var(--card-2); border: 1px solid var(--border); color: var(--text);
+    border-radius: 8px; padding: 8px 14px; font-size: 13px; cursor: pointer;
+  }
+  .copy-btn:hover { border-color: var(--accent); }
+  .meaning { font-size: 17px; margin-bottom: 18px; }
+  .meaning strong { color: var(--green); }
+  .runs { list-style: none; }
+  .runs li {
+    display: flex; align-items: center; gap: 12px; padding: 9px 0;
+    border-top: 1px solid var(--border); font-size: 14.5px;
+  }
+  .runs li:first-child { border-top: none; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+  .runs time { font-family: var(--mono); }
+
+  footer { text-align: center; color: var(--muted); font-size: 13px; margin-top: 36px; }
+  footer a { color: var(--accent); text-decoration: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="logo">*/5</div>
+    <h1>Cron<span>Craft</span></h1>
+    <p class="tagline">Build cron expressions visually — understand them instantly.</p>
+  </header>
+
+  <section class="card">
+    <h2>Start from a preset</h2>
+    <div class="presets" id="presets"></div>
+  </section>
+
+  <section class="card">
+    <h2>Build your schedule</h2>
+    <div class="fields" id="fields"></div>
+    <p class="error" id="error"></p>
+    <div class="expr-row">
+      <input id="expr-input" type="text" spellcheck="false" autocomplete="off"
+             placeholder="…or paste an expression, e.g. 30 9 * * MON-FRI" aria-label="Cron expression">
+      <button class="btn" id="parse-btn">Apply</button>
+    </div>
+    <p class="hint">
+      Supports <code>*</code>, steps (<code>*/15</code>), ranges (<code>9-17</code>),
+      lists (<code>1,15</code>) and names (<code>MON</code>, <code>JAN</code>).
+      Day-of-month and day-of-week follow standard cron OR semantics.
+    </p>
+  </section>
+
+  <section class="card" id="result-card">
+    <h2>Your expression</h2>
+    <div class="expr-out">
+      <code id="expr-out">* * * * *</code>
+      <button class="copy-btn" id="copy-btn">Copy</button>
+    </div>
+    <p class="meaning" id="meaning"></p>
+    <h2>Next 5 runs</h2>
+    <ul class="runs" id="runs"></ul>
+  </section>
+
+  <footer>
+    CronCraft — a single-file tool by <a href="https://github.com/codewithkrrish">Krrish</a> ·
+    <a href="https://github.com/codewithkrrish/croncraft">Source on GitHub</a>
+  </footer>
+</div>
+
+<script id="croncraft-logic">
+/* =====================================================================
+ * CronCraft core logic — pure, dependency-free, testable.
+ * UI code lives in a separate script block; this block is the unit under
+ * test (see test/cron.test.js, which extracts this block from index.html).
+ * ===================================================================== */
+(function (global) {
+  "use strict";
+
+  /** Raised for any malformed cron expression or field. */
+  function CronParseError(message) {
+    this.name = "CronParseError";
+    this.message = message;
+    if (Error.captureStackTrace) Error.captureStackTrace(this, CronParseError);
+  }
+  CronParseError.prototype = Object.create(Error.prototype);
+  CronParseError.prototype.constructor = CronParseError;
+
+  var FIELD_SPECS = [
+    { key: "minute",     label: "Minute",       min: 0, max: 59 },
+    { key: "hour",       label: "Hour",         min: 0, max: 23 },
+    { key: "dayOfMonth", label: "Day of month", min: 1, max: 31 },
+    { key: "month",      label: "Month",        min: 1, max: 12 },
+    { key: "dayOfWeek",  label: "Day of week",  min: 0, max: 7  },
+  ];
+
+  var MONTH_NAMES = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
+                      jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
+  var DOW_NAMES   = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
+  var DOW_LONG    = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  var DOW_SHORT   = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  var MONTH_LONG  = ["January", "February", "March", "April", "May", "June",
+                     "July", "August", "September", "October", "November", "December"];
+
+  var MAX_SEARCH_MINUTES = 366 * 24 * 60; // one leap year of minutes
+  var INT_RE = /^-?\d+$/;
+
+  function isIntString(s) { return INT_RE.test(s); }
+
+  function fail(label, reason) {
+    throw new CronParseError(label + ": " + reason);
+  }
+
+  /**
+   * Resolve one atomic token (number or name) to a number for a field.
+   * @returns {number}
+   */
+  function resolveToken(token, spec) {
+    var lower = token.toLowerCase();
+    var nameMap = spec.key === "month" ? MONTH_NAMES
+                : spec.key === "dayOfWeek" ? DOW_NAMES : null;
+    if (nameMap && Object.prototype.hasOwnProperty.call(nameMap, lower)) {
+      return nameMap[lower];
+    }
+    if (!isIntString(token)) fail(spec.label, "'" + token + "' is not a number or a known name");
+    var n = parseInt(token, 10);
+    if (n < spec.min || n > spec.max) {
+      fail(spec.label, n + " is out of range (" + spec.min + "-" + spec.max + ")");
+    }
+    return n;
+  }
+
+  /**
+   * Parse one cron field into { values: number[], wildcard: boolean, step: number|null }.
+   * Day-of-week 7 is normalized to 0 (Sunday).
+   */
+  function parseField(raw, spec) {
+    if (raw === undefined || raw === null || String(raw).trim() === "") {
+      fail(spec.label, "field is empty");
+    }
+    var text = String(raw).trim();
+    if (text === "*" || text === "?") {
+      return { values: [], wildcard: true, step: null, raw: text };
+    }
+    var values = [];
+    var step = null;
+    var parts = text.split(",");
+    for (var i = 0; i < parts.length; i++) {
+      var part = parts[i].trim();
+      if (part === "") fail(spec.label, "empty entry in list '" + text + "'");
+      var base = part, stepStr = null;
+      var slash = part.indexOf("/");
+      if (slash !== -1) {
+        base = part.slice(0, slash);
+        stepStr = part.slice(slash + 1);
+        if (!isIntString(stepStr) || parseInt(stepStr, 10) <= 0) {
+          fail(spec.label, "step '/" + stepStr + "' must be a positive integer");
+        }
+        step = parseInt(stepStr, 10);
+      }
+      var lo, hi;
+      if (base === "*") {
+        lo = spec.min; hi = spec.max;
+      } else {
+        var dash = base.indexOf("-");
+        if (dash !== -1) {
+          lo = resolveToken(base.slice(0, dash), spec);
+          hi = resolveToken(base.slice(dash + 1), spec);
+          if (lo > hi) fail(spec.label, "range '" + base + "' is reversed");
+        } else {
+          lo = hi = resolveToken(base, spec);
+        }
+      }
+      var s = step === null ? 1 : step;
+      for (var v = lo; v <= hi; v += s) values.push(v);
+      step = null; // step applies per list entry only
+    }
+    var seen = {};
+    var unique = [];
+    for (var j = 0; j < values.length; j++) {
+      var norm = (spec.key === "dayOfWeek" && values[j] === 7) ? 0 : values[j];
+      if (!seen[norm]) { seen[norm] = true; unique.push(norm); }
+    }
+    unique.sort(function (a, b) { return a - b; });
+    return { values: unique, wildcard: false, step: null, raw: text };
+  }
+
+  /** Detect a pure "step" field like `*\/15` for nicer output. */
+  function detectStep(raw, spec) {
+    var m = /^\*\/(\d+)$/.exec(String(raw).trim());
+    if (!m) return null;
+    var n = parseInt(m[1], 10);
+    if (n <= 0 || n > (spec.max - spec.min + 1)) return null;
+    return n;
+  }
+
+  /**
+   * Parse a full 5-field cron expression.
+   * @returns {{fields: Array, expression: string}}
+   * @throws {CronParseError}
+   */
+  function parseExpression(expr) {
+    if (expr === undefined || expr === null || String(expr).trim() === "") {
+      throw new CronParseError("Expression is empty");
+    }
+    var parts = String(expr).trim().split(/\s+/);
+    if (parts.length !== 5) {
+      throw new CronParseError(
+        "Expected 5 fields (minute hour day-of-month month day-of-week), got " + parts.length);
+    }
+    var fields = [];
+    for (var i = 0; i < 5; i++) fields.push(parseField(parts[i], FIELD_SPECS[i]));
+    return { fields: fields, expression: parts.join(" ") };
+  }
+
+  function fieldMatches(field, value) {
+    if (field.wildcard) return true;
+    return field.values.indexOf(value) !== -1;
+  }
+
+  /**
+   * Standard cron day semantics: if both day-of-month and day-of-week are
+   * restricted, a date matches when EITHER matches; otherwise the restricted
+   * one (or the single `*` case) decides.
+   */
+  function dateMatches(fields, date) {
+    if (!fieldMatches(fields[0], date.getMinutes())) return false;
+    if (!fieldMatches(fields[1], date.getHours())) return false;
+    if (!fieldMatches(fields[3], date.getMonth() + 1)) return false;
+    var dom = fields[2], dow = fields[4];
+    var domR = !dom.wildcard, dowR = !dow.wildcard;
+    var domOk = fieldMatches(dom, date.getDate());
+    var dowOk = fieldMatches(dow, date.getDay());
+    if (domR && dowR) return domOk || dowOk;
+    if (domR) return domOk;
+    if (dowR) return dowOk;
+    return true;
+  }
+
+  /**
+   * Next `count` run times strictly after `from` (defaults to now).
+   * @throws {CronParseError} when nothing matches within a year.
+   */
+  function nextRuns(parsed, count, from) {
+    var cursor = from ? new Date(from.getTime()) : new Date();
+    cursor.setSeconds(0, 0);
+    cursor.setMinutes(cursor.getMinutes() + 1);
+    var out = [];
+    for (var i = 0; i < MAX_SEARCH_MINUTES; i++) {
+      if (dateMatches(parsed.fields, cursor)) {
+        out.push(new Date(cursor.getTime()));
+        if (out.length >= count) return out;
+      }
+      cursor.setMinutes(cursor.getMinutes() + 1);
+    }
+    throw new CronParseError("No run found within a year — the schedule may never fire");
+  }
+
+  /* ---------------- plain-English descriptions ---------------- */
+
+  function pad2(n) { return (n < 10 ? "0" : "") + n; }
+
+  function ordinal(n) {
+    var s = ["th", "st", "nd", "rd"], v = n % 100;
+    return n + (s[(v - 20) % 10] || s[v] || s[0]);
+  }
+
+  function joinNames(items) {
+    if (items.length === 1) return items[0];
+    return items.slice(0, -1).join(", ") + " and " + items[items.length - 1];
+  }
+
+  function describeTime(minute, hour, minuteRaw, hourRaw) {
+    var mStep = detectStep(minuteRaw, FIELD_SPECS[0]);
+    var hStep = detectStep(hourRaw, FIELD_SPECS[1]);
+    if (minute.wildcard && hour.wildcard) return "every minute";
+    if (mStep && hour.wildcard) return "every " + mStep + " minutes";
+    if (hStep && minute.values.length === 1) {
+      return "every " + hStep + " hours at minute " + minute.values[0];
+    }
+    if (minute.values.length === 1 && hour.wildcard) {
+      return "at " + minute.values[0] + " minutes past every hour";
+    }
+    if (minute.values.length === 1 && hour.values.length === 1) {
+      return "at " + pad2(hour.values[0]) + ":" + pad2(minute.values[0]);
+    }
+    if (minute.values.length === 1 && !hour.wildcard) {
+      var hours = hour.values.map(function (h) { return pad2(h) + ":" + pad2(minute.values[0]); });
+      return "at " + joinNames(hours);
+    }
+    if (!minute.wildcard && !hour.wildcard) {
+      return "at minute " + minute.values.join(",") + " of hour " + hour.values.join(",");
+    }
+    return "on schedule " + minuteRaw + " " + hourRaw;
+  }
+
+  function isWeekdays(values) {
+    return values.length === 5 && values.join(",") === "1,2,3,4,5";
+  }
+  function isWeekend(values) {
+    return values.length === 2 && values.join(",") === "0,6";
+  }
+
+  function describeDate(dom, month, dow, domRaw, monthRaw, dowRaw) {
+    var parts = [];
+    if (!dow.wildcard) {
+      if (isWeekdays(dow.values)) parts.push("every weekday");
+      else if (isWeekend(dow.values)) parts.push("every weekend");
+      else parts.push("every " + joinNames(dow.values.map(function (d) { return DOW_LONG[d]; })));
+    }
+    if (!dom.wildcard) {
+      parts.push("on the " + joinNames(dom.values.map(ordinal)));
+    }
+    if (!month.wildcard) {
+      parts.push("in " + joinNames(month.values.map(function (m) { return MONTH_LONG[m - 1]; })));
+    }
+    if (parts.length === 0) return "every day";
+    // Combine day-of-month + month reads better as "on the 1st of January"
+    if (!dom.wildcard && !month.wildcard && dow.wildcard) {
+      return "on the " + joinNames(dom.values.map(ordinal)) + " of " +
+             joinNames(month.values.map(function (m) { return MONTH_LONG[m - 1]; }));
+    }
+    if (!dom.wildcard && month.wildcard && dow.wildcard) {
+      return "on the " + joinNames(dom.values.map(ordinal)) + " of every month";
+    }
+    return parts.join(", ");
+  }
+
+  /**
+   * One plain-English sentence for a parsed expression.
+   */
+  function describe(parsed, rawFields) {
+    var f = parsed.fields;
+    var time = describeTime(f[0], f[1], rawFields[0], rawFields[1]);
+    var date = describeDate(f[2], f[3], f[4], rawFields[2], rawFields[3], rawFields[4]);
+    var sentence;
+    if (date === "every day" &&
+        (time === "every minute" || time.indexOf("every ") === 0 || /every hour$/.test(time))) {
+      // "Every 5 minutes", "At 0 minutes past every hour" — "every day" is implied.
+      sentence = time.charAt(0).toUpperCase() + time.slice(1);
+    } else {
+      sentence = time.charAt(0).toUpperCase() + time.slice(1) + " " + date;
+    }
+    return sentence.replace(/\s+/g, " ").trim();
+  }
+
+  var PRESETS = [
+    { label: "Every minute",      expr: "* * * * *" },
+    { label: "Every 5 minutes",   expr: "*/5 * * * *" },
+    { label: "Hourly",            expr: "0 * * * *" },
+    { label: "Daily at 9:00",     expr: "0 9 * * *" },
+    { label: "Weekdays at 18:00", expr: "0 18 * * MON-FRI" },
+    { label: "Monday at 8:00",    expr: "0 8 * * MON" },
+    { label: "1st of month",      expr: "0 9 1 * *" },
+    { label: "New Year midnight", expr: "0 0 1 1 *" },
+  ];
+
+  global.CronCraft = {
+    CronParseError: CronParseError,
+    FIELD_SPECS: FIELD_SPECS,
+    PRESETS: PRESETS,
+    parseField: parseField,
+    parseExpression: parseExpression,
+    nextRuns: nextRuns,
+    describe: describe,
+    ordinal: ordinal,
+  };
+})(typeof window !== "undefined" ? window : globalThis);
+</script>
+
+<script>
+/* UI layer — thin wiring only; all logic lives in CronCraft. */
+(function () {
+  "use strict";
+  var CC = window.CronCraft;
+  var fieldsEl = document.getElementById("fields");
+  var exprInput = document.getElementById("expr-input");
+  var exprOut = document.getElementById("expr-out");
+  var meaningEl = document.getElementById("meaning");
+  var runsEl = document.getElementById("runs");
+  var errorEl = document.getElementById("error");
+  var inputs = [];
+
+  CC.FIELD_SPECS.forEach(function (spec, i) {
+    var div = document.createElement("div");
+    div.className = "field";
+    var label = document.createElement("label");
+    label.innerHTML = "<b>" + spec.label + "</b><br>" + spec.min + "–" + spec.max;
+    var input = document.createElement("input");
+    input.type = "text"; input.value = "*"; input.spellcheck = false;
+    input.setAttribute("aria-label", spec.label);
+    input.addEventListener("input", function () { render(false); });
+    div.appendChild(label); div.appendChild(input);
+    fieldsEl.appendChild(div); inputs.push(input);
+  });
+
+  var presetsEl = document.getElementById("presets");
+  CC.PRESETS.forEach(function (p) {
+    var b = document.createElement("button");
+    b.className = "preset"; b.textContent = p.label;
+    b.addEventListener("click", function () {
+      setFields(p.expr);
+      Array.prototype.forEach.call(presetsEl.children, function (c) { c.classList.remove("active"); });
+      b.classList.add("active");
+    });
+    presetsEl.appendChild(b);
+  });
+
+  function setFields(expr) {
+    var parts = expr.trim().split(/\s+/);
+    parts.forEach(function (p, i) { if (inputs[i]) inputs[i].value = p; });
+    render(true);
+  }
+
+  function fmtDate(d) {
+    return d.toLocaleString("en-GB", {
+      weekday: "short", day: "numeric", month: "short", year: "numeric",
+      hour: "2-digit", minute: "2-digit", hour12: false,
+    });
+  }
+
+  function render(fromFields) {
+    errorEl.classList.remove("show");
+    inputs.forEach(function (inp) { inp.classList.remove("invalid"); });
+    try {
+      var raws = inputs.map(function (inp) { return inp.value; });
+      var parsed = CC.parseExpression(raws.join(" "));
+      var sentence = CC.describe(parsed, raws);
+      exprOut.textContent = parsed.expression;
+      meaningEl.innerHTML = "<strong>" + sentence + ".</strong>";
+      var runs = CC.nextRuns(parsed, 5);
+      runsEl.innerHTML = "";
+      runs.forEach(function (r) {
+        var li = document.createElement("li");
+        var dot = document.createElement("span"); dot.className = "dot";
+        var t = document.createElement("time"); t.textContent = fmtDate(r);
+        li.appendChild(dot); li.appendChild(t); runsEl.appendChild(li);
+      });
+      if (!fromFields) exprInput.value = parsed.expression;
+    } catch (e) {
+      exprOut.textContent = "—";
+      meaningEl.innerHTML = "";
+      runsEl.innerHTML = "";
+      errorEl.textContent = e.message || "Invalid expression";
+      errorEl.classList.add("show");
+      inputs.forEach(function (inp, i) {
+        try { CC.parseField(inp.value, CC.FIELD_SPECS[i]); }
+        catch (err) { inp.classList.add("invalid"); }
+      });
+    }
+  }
+
+  document.getElementById("parse-btn").addEventListener("click", function () {
+    try {
+      var parsed = CC.parseExpression(exprInput.value);
+      setFields(parsed.expression);
+    } catch (e) {
+      errorEl.textContent = e.message || "Invalid expression";
+      errorEl.classList.add("show");
+    }
+  });
+  exprInput.addEventListener("keydown", function (ev) {
+    if (ev.key === "Enter") document.getElementById("parse-btn").click();
+  });
+
+  document.getElementById("copy-btn").addEventListener("click", function () {
+    var text = exprOut.textContent;
+    var done = function () {
+      var btn = document.getElementById("copy-btn");
+      btn.textContent = "Copied"; setTimeout(function () { btn.textContent = "Copy"; }, 1200);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, done);
+    } else {
+      var ta = document.createElement("textarea");
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); } catch (e) {}
+      document.body.removeChild(ta); done();
+    }
+  });
+
+  render(true);
+})();
+</script>
+</body>
+</html>
